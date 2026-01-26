@@ -55,15 +55,22 @@ def unlock_screen():
 def main():
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="RFID Screen Lock/Unlock Toggle Tool")
-    parser.add_argument('--uid', type=str, required=True, help="The authorized Card UID (e.g., '04 ab 12 cd')")
+    parser.add_argument('--uid', type=str, default='', help="The authorized Card UID (e.g., '04 ab 12 cd')")
     parser.add_argument('--port', type=str, default='/dev/ttyACM0', help="Serial port (default: /dev/ttyACM0)")
     parser.add_argument('--baud', type=int, default=115200, help="Baud rate (default: 115200)")
     parser.add_argument('--dry-run', action='store_true', default=False, help="Dry run")
 
     args = parser.parse_args()
 
+    uid = args.uid
+    if not uid or len(uid) == 0:
+        uid = os.getenv("NFC_UID")
+
+    if not uid or len(uid) == 0:
+        log_event(f"NFC UID not speicified")
+
     # Normalize the provided UID (remove spaces and lowercase)
-    authorized_uid = args.uid.replace(" ", "").lower()
+    authorized_uid = uid.replace(" ", "").lower()
 
     try:
         ser = serial.Serial(args.port, args.baud, timeout=1)
