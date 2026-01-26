@@ -1,0 +1,66 @@
+rfid-unlock
+-----------
+
+Lock or Unlock your Ubuntu Desktop by an NFC card.
+
+Environment
+-----------
+
+Ubuntu 24.04
+1x M5Stack NanoC6
+1x Unit RFID2
+
+Interface:
+  LED blue: standby
+  LED green flashing: card read successed
+  NanoC6 UART: /dev/ttyACM0
+
+Usage
+-----
+
+0. Connect M5Stack NanoC6 and Unit RFID2 to your computer.
+
+  PC <==USB-C== [NanoC6] <== Grov == [Unit RFID2]
+
+1. Checkout you NFC ID:
+  > ./rfid-unlock.py --dry-run
+  [2026-01-26 15:09:02] Serial: New RFID/NFC card found...
+  [2026-01-26 15:09:02] Serial: PICC type: MIFARE 1KB
+  [2026-01-26 15:09:02] Serial: Card UID: EC A6 0D 48
+
+2. Write NFC ID to ~/.nfc_uid
+  > echo "EC A6 0D 48" > ~/.nfc_uid
+
+3. Set User name in the rfid-unlock.service [IMPORTANT]
+  [Service]
+  User=nio
+
+4. Install rfid-unlock.service
+  > ./install-service.sh
+
+Others
+------
+
+1. Stop rfid-unlock.service
+  > ./stop-service.sh
+
+2. Check rfid logs
+  > journalctl -f -u rfid-unlock.service
+
+3. Serial port
+  > ls -l /dev/serial/by-id/
+  lrwxrwxrwx 1 root root 13  1 26 14:05 usb-Espressif_USB_JTAG_serial_debug_unit_9C:13:9E:D3:45:58-if00 -> ../../ttyACM0
+
+Reference
+---------
+
+https://docs.m5stack.com/zh_CN/core/M5NanoC6
+https://docs.m5stack.com/zh_CN/unit/rfid2
+
+https://docs.m5stack.com/zh_CN/arduino/m5nanoc6/program
+https://docs.m5stack.com/zh_CN/arduino/projects/unit/unit_rfid
+
+Author
+------
+
+Walter H. YANG
