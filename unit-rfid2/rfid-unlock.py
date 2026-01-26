@@ -164,7 +164,7 @@ def main():
 
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="RFID Screen Lock/Unlock Toggle Tool")
-    parser.add_argument('--uid', type=str, default='', help="The authorized Card UID (e.g., '04 ab 12 cd')")
+    parser.add_argument('--uid', type=str, default='', help="The authorized Card UID (e.g., '20 2b 01 2b')")
     parser.add_argument('--port', type=str, default='/dev/ttyACM0', help="Serial port (default: /dev/ttyACM0)")
     parser.add_argument('--baud', type=int, default=115200, help="Baud rate (default: 115200)")
     parser.add_argument('--dry-run', action='store_true', default=False, help="Dry run")

@@ -26,10 +26,10 @@ Usage
   > ./rfid-unlock.py --dry-run
   [2026-01-26 15:09:02] Serial: New RFID/NFC card found...
   [2026-01-26 15:09:02] Serial: PICC type: MIFARE 1KB
-  [2026-01-26 15:09:02] Serial: Card UID: EC A6 0D 48
+  [2026-01-26 15:09:02] Serial: Card UID: 20 2B 01 2B
 
 2. Write NFC ID to ~/.nfc_uid
-  > echo "EC A6 0D 48" > ~/.nfc_uid
+  > echo "20 2B 01 2B" > ~/.nfc_uid
 
 3. Set User name in the rfid-unlock.service [IMPORTANT]
   [Service]
