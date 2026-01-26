@@ -6,6 +6,8 @@ MFRC522_I2C mfrc522(0x28, -1);  // 0x28: I2C address of Unit RFID / RFID2; -1: r
 #define LED_PIN    20
 #define ENABLE_PIN 19
 #define NUM_LEDS   1
+#define GPIO1      1
+#define GPIO2      2
 
 void setup() {
   // Initialize NanoC6 and serial communication
@@ -15,7 +17,7 @@ void setup() {
   Serial.begin(115200);
 
   // Enable I2C GPIO1/2
-  Wire.begin(2, 1);   // SDA, SCL
+  Wire.begin(GPIO2, GPIO1);   // SDA, SCL
   delay(100);
   mfrc522.PCD_Init();
 

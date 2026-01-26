@@ -3,48 +3,100 @@
 import serial
 import subprocess
 import os
+import argparse
+from datetime import datetime
 
-# Configuration
-# Replace with your NanoC6 port (check with ls /dev/ttyACM*)
-SERIAL_PORT = '/dev/ttyACM0' 
-BAUD_RATE = 115200
-# Replace with your actual Card UID (lowercase)
-AUTHORIZED_UID = 'EC A6 0D 48' 
+# --- Functions ---
+
+def log_event(message):
+    """
+    Log events with a human-readable timestamp.
+    """
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] {message}")
+
+def execute_cmd(cmd):
+    subprocess.run(cmd,
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+
+def is_screen_locked():
+    """
+    Check if the GNOME screensaver is currently active via D-Bus.
+    """
+    try:
+        output = subprocess.check_output([
+            'gdbus', 'call', '--session',
+            '--dest', 'org.gnome.ScreenSaver',
+            '--object-path', '/org/gnome/ScreenSaver',
+            '--method', 'org.gnome.ScreenSaver.GetActive'
+        ]).decode('utf-8')
+        return 'true' in output.lower()
+    except Exception as e:
+        log_event(f"Error checking screen status: {e}")
+        return False
+
+def lock_screen():
+    log_event("Action: Locking screen.")
+    subprocess.run(['xdg-screensaver', 'lock'])
 
 def unlock_screen():
-    """
-    Attempts to unlock the GNOME screen saver for the current user.
-    """
-    print("Authorized UID detected. Unlocking...")
-    # For GNOME on Ubuntu 24.04
+    log_event("Action: Waking up and unlocking screen.")
+    # Step 1: Wake up the display
+    execute_cmd([
+        'gdbus', 'call', '--session',
+        '--dest', 'org.gnome.ScreenSaver',
+        '--object-path', '/org/gnome/ScreenSaver',
+        '--method', 'org.gnome.ScreenSaver.SetActive', 'true'
+    ])
+    # Step 2: Unlock the session
     subprocess.run(['loginctl', 'unlock-session'])
 
 def main():
+    # --- Argument Parsing ---
+    parser = argparse.ArgumentParser(description="RFID Screen Lock/Unlock Toggle Tool")
+    parser.add_argument('--uid', type=str, required=True, help="The authorized Card UID (e.g., '04 ab 12 cd')")
+    parser.add_argument('--port', type=str, default='/dev/ttyACM0', help="Serial port (default: /dev/ttyACM0)")
+    parser.add_argument('--baud', type=int, default=115200, help="Baud rate (default: 115200)")
+    parser.add_argument('--dry-run', action='store_true', default=False, help="Dry run")
+
+    args = parser.parse_args()
+
+    # Normalize the provided UID (remove spaces and lowercase)
+    authorized_uid = args.uid.replace(" ", "").lower()
+
     try:
-        # Open serial connection
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-        print(f"Listening for RFID cards on {SERIAL_PORT}...")
+        ser = serial.Serial(args.port, args.baud, timeout=1)
+        log_event(f"Service started. Listening on {args.port}")
+        log_event(f"Authorized UID (hex): {authorized_uid}")
 
         while True:
             if ser.in_waiting > 0:
-                # Read line and strip whitespace
-                line = ser.readline().decode('utf-8').strip()
-                print(line);
-                
-                if "Card UID:" in line:
-                    # Extract the hex UID part
-                    scanned_uid = line.split(":")[1].strip()
-                    print(f"Scanned: {scanned_uid}")
+                line = ser.readline().decode('utf-8', errors='ignore').strip()
+                log_event(f"Serial: {line}")
 
-                    if scanned_uid == AUTHORIZED_UID:
-                        unlock_screen()
+                if args.dry_run:
+                    continue
+
+                if "Card UID:" in line:
+                    # Extract and normalize scanned UID
+                    scanned_uid_raw = line.split("Card UID:")[1].strip()
+                    scanned_uid = scanned_uid_raw.replace(" ", "").lower()
+
+                    log_event(f"Scanned: {scanned_uid_raw}")
+
+                    if scanned_uid == authorized_uid:
+                        if is_screen_locked():
+                            unlock_screen()
+                        else:
+                            lock_screen()
                     else:
-                        print("Access Denied: Unknown UID")
-                        
+                        log_event("Access Denied: Unauthorized card.")
+
     except KeyboardInterrupt:
-        print("Exiting...")
+        log_event("Service stopped.")
     except Exception as e:
-        print(f"Error: {e}")
+        log_event(f"Critical error: {e}")
     finally:
         if 'ser' in locals():
             ser.close()
