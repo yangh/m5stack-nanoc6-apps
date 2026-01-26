@@ -1,0 +1,15 @@
+[Unit]
+Description=RFID Card Unlock Service
+After=network.target
+
+[Service]
+User=nio
+Environment=PYTHONUNBUFFERED=1
+
+# Run as your current user to access the session bus
+ExecStart=/usr/bin/python3 /home/nio/workspace/oos/m5stack/nanoc6/unit-rfid2/rfid-unlock.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

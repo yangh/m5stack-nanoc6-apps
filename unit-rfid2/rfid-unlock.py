@@ -3,10 +3,67 @@
 import serial
 import subprocess
 import os
+import pwd
+import time
 import argparse
 from datetime import datetime
 
 # --- Functions ---
+
+def auto_set_display():
+    if 'DISPLAY' not in os.environ:
+        try:
+            # Try to find the X socket
+            displays = os.listdir('/tmp/.X11-unix/')
+            if displays:
+                # Take the last one (e.g., 'X1' -> ':1')
+                display_num = displays[-1].replace('X', ':')
+                os.environ['DISPLAY'] = display_num
+                return display_num
+        except Exception:
+            os.environ['DISPLAY'] = ":0" # Fallback
+
+    return os.environ.get('DISPLAY')
+
+def get_active_graphical_session():
+    """Finds the Session ID that is both graphical and active."""
+    try:
+        # Get list of all sessions
+        output = subprocess.check_output(['loginctl', 'list-sessions', '--no-legend']).decode()
+        for line in output.splitlines():
+            parts = line.split()
+            if not parts: continue
+            sid = parts[0]
+
+            # Check properties of each session
+            info = subprocess.check_output(['loginctl', 'show-session', sid]).decode()
+            is_graphical = "Type=wayland" in info or "Type=x11" in info
+            is_active = "Active=yes" in info
+
+            if is_graphical and is_active:
+                return sid
+    except Exception as e:
+        log_event(f"Failed to probe sessions: {e}")
+    return "auto" # Fallback to auto if discovery fails
+
+def setup_env():
+    # Get current user's UID and username
+    uid = os.getuid()
+    username = pwd.getpwuid(uid).pw_name
+
+    # Dynamically set environment variables if they are missing
+    if 'XDG_RUNTIME_DIR' not in os.environ:
+        os.environ['XDG_RUNTIME_DIR'] = f"/run/user/{uid}"
+
+    if 'DBUS_SESSION_BUS_ADDRESS' not in os.environ:
+        os.environ['DBUS_SESSION_BUS_ADDRESS'] = f"unix:path=/run/user/{uid}/bus"
+
+    auto_set_display()
+
+    important_envs = ['USER', 'DISPLAY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS']
+    for key in sorted(os.environ.keys()):
+        if key in important_envs:
+            print(f"{key}= {os.environ[key]}")
 
 def log_event(message):
     """
@@ -44,7 +101,7 @@ def unlock_screen():
     log_event("Action: Waking up and unlocking screen.")
 
     # Step 1: Wake up the display
-    execute_cmd([
+    subprocess.run([
         'gdbus', 'call', '--session',
         '--dest', 'org.gnome.ScreenSaver',
         '--object-path', '/org/gnome/ScreenSaver',
@@ -53,22 +110,17 @@ def unlock_screen():
 
     # Step 2: Unlock the session
     # Get the specific session ID for the user
-    try:
-        # Get the first session ID for the current user
-        session_id = subprocess.check_output(['loginctl', 'list-sessions', '--no-legend']).decode().split()[0]
-        # Unlock the specific session instead of 'auto'
-        subprocess.run(['loginctl', 'unlock-session', session_id],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        log_event(f"Failed to resolve session ID: {e}")
+    session_id = get_active_graphical_session()
+    log_event(f"Unlock session: {session_id}")
+    subprocess.run(['loginctl', 'unlock-session', session_id])
 
     # 3. CRITICAL: Reset the idle timer to prevent immediate re-blanking
     # This simulates user activity via D-Bus
-    execute_cmd([
+    subprocess.run([
         'gdbus', 'call', '--session',
         '--dest', 'org.gnome.Mutter.IdleMonitor',
         '--object-path', '/org/gnome/Mutter/IdleMonitor/Core',
-        '--method', 'org.gnome.Mutter.IdleMonitor.ResetIdleness'
+        '--method', 'org.gnome.Mutter.IdleMonitor.ResetIdletime'
     ])
 
 def get_uid_from_file():
@@ -96,6 +148,8 @@ def get_uid_from_file():
         return None
 
 def main():
+    setup_env()
+
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="RFID Screen Lock/Unlock Toggle Tool")
     parser.add_argument('--uid', type=str, default='', help="The authorized Card UID (e.g., '04 ab 12 cd')")

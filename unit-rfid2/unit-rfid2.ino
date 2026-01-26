@@ -86,7 +86,8 @@ void loop() {
 
     led_card_found();
     led_standby();
-    delay(500);
+    // A bit long delay to avoid flashing
+    delay(1000);
   } else {
     delay(500);
   }
