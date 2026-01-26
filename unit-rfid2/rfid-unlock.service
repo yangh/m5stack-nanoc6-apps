@@ -7,7 +7,7 @@ User=nio
 Environment=PYTHONUNBUFFERED=1
 
 # Run as your current user to access the session bus
-ExecStart=/usr/bin/python3 /home/nio/workspace/oos/m5stack/nanoc6/unit-rfid2/rfid-unlock.py
+ExecStart=/usr/bin/python3 /home/nio/workspace/oos/m5stack/nanoc6/unit-rfid2/rfid-unlock.py --port "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_9C:13:9E:D3:45:58-if00"
 Restart=always
 RestartSec=5
 
