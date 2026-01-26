@@ -42,6 +42,7 @@ def lock_screen():
 
 def unlock_screen():
     log_event("Action: Waking up and unlocking screen.")
+
     # Step 1: Wake up the display
     execute_cmd([
         'gdbus', 'call', '--session',
@@ -49,8 +50,50 @@ def unlock_screen():
         '--object-path', '/org/gnome/ScreenSaver',
         '--method', 'org.gnome.ScreenSaver.SetActive', 'true'
     ])
+
     # Step 2: Unlock the session
-    subprocess.run(['loginctl', 'unlock-session'])
+    # Get the specific session ID for the user
+    try:
+        # Get the first session ID for the current user
+        session_id = subprocess.check_output(['loginctl', 'list-sessions', '--no-legend']).decode().split()[0]
+        # Unlock the specific session instead of 'auto'
+        subprocess.run(['loginctl', 'unlock-session', session_id],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        log_event(f"Failed to resolve session ID: {e}")
+
+    # 3. CRITICAL: Reset the idle timer to prevent immediate re-blanking
+    # This simulates user activity via D-Bus
+    execute_cmd([
+        'gdbus', 'call', '--session',
+        '--dest', 'org.gnome.Mutter.IdleMonitor',
+        '--object-path', '/org/gnome/Mutter/IdleMonitor/Core',
+        '--method', 'org.gnome.Mutter.IdleMonitor.ResetIdleness'
+    ])
+
+def get_uid_from_file():
+    """
+    Reads the authorized UID from ~/.nfc_uid.
+    Returns the cleaned UID string or None if failed.
+    """
+    # Expand ~ to the full home directory path
+    file_path = os.path.expanduser("~/.nfc_uid")
+
+    if not os.path.exists(file_path):
+        log_event(f"Error: Config file {file_path} not found.")
+        return None
+
+    try:
+        with open(file_path, 'r') as f:
+            # Read, remove whitespace/newlines, and convert to lowercase
+            uid = f.read().strip().replace(" ", "").lower()
+            if not uid:
+                log_event("Error: ~/.nfc_uid is empty.")
+                return None
+            return uid
+    except Exception as e:
+        log_event(f"Error reading ~/.nfc_uid: {e}")
+        return None
 
 def main():
     # --- Argument Parsing ---
@@ -65,6 +108,9 @@ def main():
     uid = args.uid
     if not uid or len(uid) == 0:
         uid = os.getenv("NFC_UID")
+
+    if not uid or len(uid) == 0:
+        uid = get_uid_from_file()
 
     if not uid or len(uid) == 0:
         log_event(f"NFC UID not speicified")
