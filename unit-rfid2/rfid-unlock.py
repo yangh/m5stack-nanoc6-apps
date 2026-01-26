@@ -4,9 +4,10 @@ import serial
 import subprocess
 import os
 import pwd
-import time
 import argparse
 from datetime import datetime
+
+args = None
 
 # --- Functions ---
 
@@ -61,16 +62,27 @@ def setup_env():
     auto_set_display()
 
     important_envs = ['USER', 'DISPLAY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS']
+    log_debug(f"Dump environment")
     for key in sorted(os.environ.keys()):
         if key in important_envs:
-            print(f"{key}= {os.environ[key]}")
+            log_debug(f"{key}= {os.environ[key]}")
+
+def log_debug(message, debug = False):
+    """
+    Log events with a human-readable timestamp.
+    """
+    if debug or args.debug:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if args.debug:
+            print(f"[{timestamp}] {message}")
+        else:
+            print(f"{message}")
 
 def log_event(message):
     """
     Log events with a human-readable timestamp.
     """
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] {message}")
+    log_debug(message, True)
 
 def execute_cmd(cmd):
     subprocess.run(cmd,
@@ -148,7 +160,7 @@ def get_uid_from_file():
         return None
 
 def main():
-    setup_env()
+    global args
 
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="RFID Screen Lock/Unlock Toggle Tool")
@@ -156,8 +168,11 @@ def main():
     parser.add_argument('--port', type=str, default='/dev/ttyACM0', help="Serial port (default: /dev/ttyACM0)")
     parser.add_argument('--baud', type=int, default=115200, help="Baud rate (default: 115200)")
     parser.add_argument('--dry-run', action='store_true', default=False, help="Dry run")
+    parser.add_argument('--debug', action='store_true', default=False, help="Debug")
 
     args = parser.parse_args()
+
+    setup_env()
 
     uid = args.uid
     if not uid or len(uid) == 0:
@@ -175,12 +190,12 @@ def main():
     try:
         ser = serial.Serial(args.port, args.baud, timeout=1)
         log_event(f"Service started. Listening on {args.port}")
-        log_event(f"Authorized UID (hex): {authorized_uid}")
+        log_debug(f"Authorized UID (hex): {authorized_uid}")
 
         while True:
             if ser.in_waiting > 0:
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
-                log_event(f"Serial: {line}")
+                log_debug(f"Serial: {line}")
 
                 if args.dry_run:
                     continue
@@ -189,8 +204,7 @@ def main():
                     # Extract and normalize scanned UID
                     scanned_uid_raw = line.split("Card UID:")[1].strip()
                     scanned_uid = scanned_uid_raw.replace(" ", "").lower()
-
-                    log_event(f"Scanned: {scanned_uid_raw}")
+                    log_debug(f"Scanned: {scanned_uid_raw}")
 
                     if scanned_uid == authorized_uid:
                         if is_screen_locked():
