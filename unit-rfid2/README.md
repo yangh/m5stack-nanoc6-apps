@@ -15,12 +15,32 @@ Interface:
   LED green flashing: card read successed
   NanoC6 UART: /dev/ttyACM0
 
+rfid-unlock.py
+--------------
+
+This the main program to run as a system service to monitor NFC scanner.
+
+./rfid-unlock.py --help
+usage: rfid-unlock.py [-h] [--uid UID] [--port PORT] [--baud BAUD] [--dry-run] [--debug]
+
+RFID Screen Lock/Unlock Toggle Tool
+
+options:
+  -h, --help   show this help message and exit
+  --uid UID    The authorized Card UID (e.g., '20 2b 01 2b')
+  --port PORT  Serial port (default: /dev/ttyACM0)
+  --baud BAUD  Baud rate (default: 115200)
+  --dry-run    Dry run
+  --debug      Debug info
+
 Usage
 -----
 
 0. Connect M5Stack NanoC6 and Unit RFID2 to your computer.
 
   PC <==USB-C== [NanoC6] <== Grov == [Unit RFID2]
+
+  Load the unit-rfid2.ino into NanoC6 with Arduino IDE, then close the IDE.
 
 1. Checkout you NFC ID:
   > ./rfid-unlock.py --dry-run
@@ -35,13 +55,20 @@ Usage
   [Service]
   User=nio
 
-4. Install rfid-unlock.service
+4. Specify serial port of NanoC6 in the rfid-unlock.service
+  Find correct serial port device and set it into the ExecStart command.
+
+5. Install rfid-unlock.service
   > ./install-service.sh
 
 Others
 ------
 
 1. Stop rfid-unlock.service
+  You cann't run the rdif-unlock service and Ardunio IDE at the same time, due
+  the both access the serail port of the NanoC6. So you can stop the service if
+  you want to using IDE for development, and vice visa.
+
   > ./stop-service.sh
 
 2. Check rfid logs
