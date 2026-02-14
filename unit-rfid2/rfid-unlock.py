@@ -6,6 +6,7 @@ import os
 import pwd
 import argparse
 from datetime import datetime
+import time
 
 args = None
 
@@ -213,6 +214,9 @@ def main():
                             lock_screen()
                     else:
                         log_event("Access Denied: Unauthorized card.")
+            else:
+                # Prevent busy-waiting when no data available
+                time.sleep(0.1)
 
     except KeyboardInterrupt:
         log_event("Service stopped.")
